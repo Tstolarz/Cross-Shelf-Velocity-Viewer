@@ -1,0 +1,9 @@
+streamlit==1.45.0
+numpy
+pandas
+xarray
+plotly
+matplotlib
+cartopy
+Pillow
+streamlit-shortcuts==0.1.3
