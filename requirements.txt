@@ -7,3 +7,4 @@ matplotlib
 cartopy
 Pillow
 streamlit-shortcuts==0.1.3
+netcdf4
