@@ -455,7 +455,7 @@ def create_map_plot(df, selected_idx, base_map_bytes, freq_label="Monthly", arro
 # ============================================================================
 
 def show_monthly_mbon_page():
-    st.markdown("## 📅 Monthly MBON Data")
+    st.markdown("## 📅 Monthly HFR Surface Current Data")
     
     # File upload or default path
     uploaded_file = st.sidebar.file_uploader(
@@ -480,7 +480,7 @@ def show_monthly_mbon_page():
             st.stop()
     
     # Load monthly data
-    with st.spinner("Loading and processing monthly MBON data..."):
+    with st.spinner("Loading and processing monthly HFR Surface Current data..."):
         df_monthly = load_mbon_data(nc_path, resample_freq='M')
         
         # Create base map once (cached)
@@ -493,13 +493,13 @@ def show_monthly_mbon_page():
     show_data_interface(df_monthly, base_map_bytes, "Monthly", freq_label="Monthly")
 
 def show_weekly_mbon_page():
-    st.markdown("## 📊 Weekly MBON Data")
+    st.markdown("## 📊 Weekly HFR Surface Current Data")
     
     # File upload or default path
     uploaded_file = st.sidebar.file_uploader(
-        "Upload MBON NetCDF file", 
+        "Upload HFR Surface Current Timeseries NetCDF file", 
         type=['nc'],
-        help="Upload your MBON current dataset",
+        help="Upload your HFR Surface Current dataset",
         key="mbon_weekly_upload"
     )
     
@@ -518,7 +518,7 @@ def show_weekly_mbon_page():
             st.stop()
     
     # Load weekly data
-    with st.spinner("Loading and processing weekly MBON data..."):
+    with st.spinner("Loading and processing weekly HFR Surface Current data..."):
         df_weekly = load_mbon_data(nc_path, resample_freq='W')
         
         # Create base map once (cached)
@@ -782,9 +782,9 @@ def main():
     st.sidebar.markdown("---")
     
     # Route to appropriate page
-    if page == "Monthly MBON":
+    if page == "Monthly HFR Surface Currents":
         show_monthly_mbon_page()
-    elif page == "Weekly MBON":
+    elif page == "Weekly HFR Surface Currents":
         show_weekly_mbon_page()
     elif page == "Weekly Surface DOPPIO":
         show_doppio_surface_page()
