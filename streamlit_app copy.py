@@ -36,7 +36,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS to reduce padding and margins and improve responsiveness
+# Custom CSS to reduce padding and margins
 st.markdown("""
 <style>
     .main > div {
@@ -52,27 +52,6 @@ st.markdown("""
     h1 {
         padding-top: 0rem;
         margin-top: 0rem;
-    }
-    /* Improve metric display responsiveness */
-    [data-testid="metric-container"] {
-        background-color: #f0f2f6;
-        border: 1px solid #d1d5db;
-        padding: 0.5rem;
-        border-radius: 0.25rem;
-        margin: 0.25rem 0;
-        overflow: hidden;
-        min-width: 0;
-    }
-    [data-testid="metric-container"] > div {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    /* Responsive text sizing */
-    @media (max-width: 768px) {
-        [data-testid="metric-container"] {
-            font-size: 0.9rem;
-        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -764,15 +743,15 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
             # Current vector information
             st.markdown(f"#### {freq_label} Current Details")
 
-            # Use 2 columns instead of 3 for better space utilization
-            col2a, col2b = st.columns(2)
+            col2a, col2b, col2c = st.columns(3)
             with col2a:
                 st.metric("Along-shelf", f"{current_row['v_along_mean']:.1f} cm/s")
-                st.metric("Cross-shelf", f"{current_row['u_cross_mean']:.1f} cm/s")
-                st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
-            with col2b:
                 st.metric("U (East)", f"{current_row['u_mean']:.1f} cm/s")
+            with col2b:
+                st.metric("Cross-shelf", f"{current_row['u_cross_mean']:.1f} cm/s")
                 st.metric("V (North)", f"{current_row['v_mean']:.1f} cm/s")
+            with col2c:
+                st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
 
         # Map section
         col_map1, col_map2, col_map3 = st.columns([1, 2, 1])
