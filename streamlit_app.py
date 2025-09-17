@@ -775,7 +775,7 @@ def main():
     
     page = st.sidebar.selectbox(
         "Choose a page:",
-        ["Monthly MBON", "Weekly MBON", "Weekly Surface DOPPIO", "Weekly Bottom DOPPIO"],
+        ["Monthly HFR Surface Currents", "Weekly HFR Surface Currents", "Weekly Surface DOPPIO", "Weekly Bottom DOPPIO"],
         help="Navigate between different data views"
     )
     
