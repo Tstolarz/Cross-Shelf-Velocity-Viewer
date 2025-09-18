@@ -95,6 +95,10 @@ def load_mbon_data(nc_path, resample_freq='M'):
         'lat': ds.lat.values if ds.lat.dims else [ds.lat.values] * len(ds.time)
     })
     
+    # Add temperature if available
+    if 'temp' in ds.variables:
+        df['temp'] = ds.temp.values  # Temperature in degrees C
+    
     # Add along-shelf and cross-shelf components (using region4 rotation)
     rot_angle = 360 - 37  # degrees
     uv_complex = df['u'] + 1j * df['v']
@@ -108,7 +112,9 @@ def load_mbon_data(nc_path, resample_freq='M'):
     
     # Resample to specified frequency with additional statistics
     df.set_index('time', inplace=True)
-    resampled = df.resample(resample_freq).agg({
+    
+    # Build aggregation dictionary dynamically
+    agg_dict = {
         'u': ['mean', 'std', 'count'],
         'v': ['mean', 'std', 'count'],  
         'u_cross': ['mean', 'std', 'count'],
@@ -116,7 +122,13 @@ def load_mbon_data(nc_path, resample_freq='M'):
         'magnitude': ['mean', 'std', 'count'],
         'lon': 'mean',
         'lat': 'mean'
-    })
+    }
+    
+    # Add temperature aggregation if available
+    if 'temp' in df.columns:
+        agg_dict['temp'] = ['mean', 'std', 'count']
+    
+    resampled = df.resample(resample_freq).agg(agg_dict)
     
     # Flatten column names
     resampled.columns = ['_'.join(col).strip() for col in resampled.columns.values]
@@ -130,6 +142,10 @@ def load_mbon_data(nc_path, resample_freq='M'):
     resampled['u_cross_stderr'] = resampled['u_cross_std'] / np.sqrt(resampled['u_cross_count'])
     resampled['v_along_stderr'] = resampled['v_along_std'] / np.sqrt(resampled['v_along_count'])
     resampled['magnitude_stderr'] = resampled['magnitude_std'] / np.sqrt(resampled['magnitude_count'])
+    
+    # Add temperature standard error if available
+    if 'temp_std' in resampled.columns:
+        resampled['temp_stderr'] = resampled['temp_std'] / np.sqrt(resampled['temp_count'])
     
     # Normalize vectors for direction display
     u_mean = resampled['u_mean']
@@ -154,6 +170,10 @@ def load_doppio_single_layer(nc_path, layer_name, resample_freq='W'):
         'lat': ds.lat.values if ds.lat.dims else [ds.lat.values] * len(ds.time)
     })
     
+    # Add temperature if available
+    if 'temp' in ds.variables:
+        df['temp'] = ds.temp.values  # Temperature in degrees C
+    
     # Add along-shelf and cross-shelf components
     rot_angle = 360 - 37  # degrees
     uv_complex = df['u'] + 1j * df['v']
@@ -165,7 +185,9 @@ def load_doppio_single_layer(nc_path, layer_name, resample_freq='W'):
     
     # Resample to specified frequency
     df.set_index('time', inplace=True)
-    resampled = df.resample(resample_freq).agg({
+    
+    # Build aggregation dictionary dynamically
+    agg_dict = {
         'u': ['mean', 'std', 'count'],
         'v': ['mean', 'std', 'count'],  
         'u_cross': ['mean', 'std', 'count'],
@@ -173,7 +195,13 @@ def load_doppio_single_layer(nc_path, layer_name, resample_freq='W'):
         'magnitude': ['mean', 'std', 'count'],
         'lon': 'mean',
         'lat': 'mean'
-    })
+    }
+    
+    # Add temperature aggregation if available
+    if 'temp' in df.columns:
+        agg_dict['temp'] = ['mean', 'std', 'count']
+    
+    resampled = df.resample(resample_freq).agg(agg_dict)
     
     # Flatten column names
     resampled.columns = ['_'.join(col).strip() for col in resampled.columns.values]
@@ -185,6 +213,10 @@ def load_doppio_single_layer(nc_path, layer_name, resample_freq='W'):
     resampled['u_cross_stderr'] = resampled['u_cross_std'] / np.sqrt(resampled['u_cross_count'])
     resampled['v_along_stderr'] = resampled['v_along_std'] / np.sqrt(resampled['v_along_count'])
     resampled['magnitude_stderr'] = resampled['magnitude_std'] / np.sqrt(resampled['magnitude_count'])
+    
+    # Add temperature standard error if available
+    if 'temp_std' in resampled.columns:
+        resampled['temp_stderr'] = resampled['temp_std'] / np.sqrt(resampled['temp_count'])
     
     # Normalize vectors
     u_mean = resampled['u_mean']
@@ -207,12 +239,27 @@ def create_timeseries_base(df, time_range=None, freq_label="Monthly", ylim=None)
     else:
         df_plot = df
     
-    fig = make_subplots(
-        rows=2, cols=1,
-        shared_xaxes=True,
-        subplot_titles=[f'{freq_label} Along-shelf Velocity', f'{freq_label} Cross-shelf Velocity'],
-        vertical_spacing=0.1
-    )
+    # Check if temperature data is available
+    has_temp = 'temp_mean' in df_plot.columns
+    
+    if has_temp:
+        # 3 rows: along-shelf, cross-shelf, temperature
+        fig = make_subplots(
+            rows=3, cols=1,
+            shared_xaxes=True,
+            subplot_titles=[f'{freq_label} Along-shelf Velocity', 
+                          f'{freq_label} Cross-shelf Velocity',
+                          f'{freq_label} Temperature'],
+            vertical_spacing=0.08
+        )
+    else:
+        # 2 rows: along-shelf, cross-shelf
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            subplot_titles=[f'{freq_label} Along-shelf Velocity', f'{freq_label} Cross-shelf Velocity'],
+            vertical_spacing=0.1
+        )
     
     # Along-shelf plot with error bars
     fig.add_trace(
@@ -256,6 +303,28 @@ def create_timeseries_base(df, time_range=None, freq_label="Monthly", ylim=None)
         row=2, col=1
     )
     
+    # Add temperature plot if available
+    if has_temp:
+        fig.add_trace(
+            go.Scatter(
+                x=df_plot['time'],
+                y=df_plot['temp_mean'],
+                mode='lines+markers',
+                name='Temperature',
+                line=dict(color='green', width=2),
+                marker=dict(size=4),
+                error_y=dict(
+                    type='data',
+                    array=df_plot['temp_stderr'],
+                    visible=True,
+                    color='rgba(0,128,0,0.3)',
+                    thickness=1
+                ),
+                hovertemplate='%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+            ),
+            row=3, col=1
+        )
+    
     # Add overall means as horizontal lines
     overall_along = df_plot['v_along_mean'].mean()
     overall_cross = df_plot['u_cross_mean'].mean()
@@ -265,9 +334,15 @@ def create_timeseries_base(df, time_range=None, freq_label="Monthly", ylim=None)
     fig.add_hline(y=overall_cross, line_dash="dash", line_color="red", 
                   line_width=1, opacity=0.7, row=2, col=1)
     
+    if has_temp:
+        overall_temp = df_plot['temp_mean'].mean()
+        fig.add_hline(y=overall_temp, line_dash="dash", line_color="green", 
+                      line_width=1, opacity=0.7, row=3, col=1)
+    
     # Layout updates
+    plot_height = 520 if has_temp else 380
     fig.update_layout(
-        height=380,
+        height=plot_height,
         showlegend=False,
         title_text=" ",
         title_x=0.5,
@@ -278,23 +353,46 @@ def create_timeseries_base(df, time_range=None, freq_label="Monthly", ylim=None)
     
     fig.update_yaxes(title_text="Velocity (cm/s)", row=1, col=1)
     fig.update_yaxes(title_text="Velocity (cm/s)", row=2, col=1)
-    fig.update_xaxes(title_text="Time", row=2, col=1)
+    
+    if has_temp:
+        fig.update_yaxes(title_text="Temperature (°C)", row=3, col=1)
+        fig.update_xaxes(title_text="Time", row=3, col=1)
+    else:
+        fig.update_xaxes(title_text="Time", row=2, col=1)
     
     # Set y-axis limits if provided
     if ylim is not None:
         fig.update_yaxes(range=ylim, row=1, col=1)
         fig.update_yaxes(range=ylim, row=2, col=1)
     
-    # Add annotations for overall means
-    fig.add_annotation(x=0.02, y=0.95, xref="paper", yref="paper",
-                      text=f"Mean: {overall_along:.1f} cm/s", 
-                      showarrow=False, font=dict(size=10, color="blue"),
-                      bgcolor="rgba(255,255,255,0.8)", bordercolor="blue", borderwidth=1)
-    
-    fig.add_annotation(x=0.02, y=0.45, xref="paper", yref="paper",
-                      text=f"Mean: {overall_cross:.1f} cm/s", 
-                      showarrow=False, font=dict(size=10, color="red"),
-                      bgcolor="rgba(255,255,255,0.8)", bordercolor="red", borderwidth=1)
+    # Add annotations for overall means  
+    if has_temp:
+        # Adjust y positions for 3 plots
+        fig.add_annotation(x=0.02, y=0.95, xref="paper", yref="paper",
+                          text=f"Mean: {overall_along:.1f} cm/s", 
+                          showarrow=False, font=dict(size=10, color="blue"),
+                          bgcolor="rgba(255,255,255,0.8)", bordercolor="blue", borderwidth=1)
+        
+        fig.add_annotation(x=0.02, y=0.63, xref="paper", yref="paper",
+                          text=f"Mean: {overall_cross:.1f} cm/s", 
+                          showarrow=False, font=dict(size=10, color="red"),
+                          bgcolor="rgba(255,255,255,0.8)", bordercolor="red", borderwidth=1)
+        
+        fig.add_annotation(x=0.02, y=0.31, xref="paper", yref="paper",
+                          text=f"Mean: {overall_temp:.1f} °C", 
+                          showarrow=False, font=dict(size=10, color="green"),
+                          bgcolor="rgba(255,255,255,0.8)", bordercolor="green", borderwidth=1)
+    else:
+        # Original positions for 2 plots
+        fig.add_annotation(x=0.02, y=0.95, xref="paper", yref="paper",
+                          text=f"Mean: {overall_along:.1f} cm/s", 
+                          showarrow=False, font=dict(size=10, color="blue"),
+                          bgcolor="rgba(255,255,255,0.8)", bordercolor="blue", borderwidth=1)
+        
+        fig.add_annotation(x=0.02, y=0.45, xref="paper", yref="paper",
+                          text=f"Mean: {overall_cross:.1f} cm/s", 
+                          showarrow=False, font=dict(size=10, color="red"),
+                          bgcolor="rgba(255,255,255,0.8)", bordercolor="red", borderwidth=1)
     
     return fig
 
@@ -306,8 +404,17 @@ def update_selection(base_fig, selected_time):
     # Deep copy to avoid modifying cached figure
     fig = copy.deepcopy(base_fig)
     
+    # Determine number of subplots based on figure structure
+    # Check if temperature trace exists by looking for the characteristic green color
+    has_temp_trace = any(
+        hasattr(trace, 'line') and hasattr(trace.line, 'color') and 
+        trace.line.color == 'green' for trace in fig.data
+    )
+    
+    num_subplots = 3 if has_temp_trace else 2
+    
     # Add vertical lines for current selection
-    for i in range(1, 3):  # Both subplots
+    for i in range(1, num_subplots + 1):
         fig.add_vline(
             x=selected_time,
             line_dash="solid",
@@ -737,12 +844,16 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
         
         # Display current selection info
         time_format = '%Y-%m' if freq_label == "Monthly" else '%Y-%m-%d'
+        temp_text = ""
+        if 'temp_mean' in current_row:
+            temp_text = f"- Temp: {current_row['temp_mean']:.1f} ± {current_row['temp_stderr']:.1f} °C\n        "
+        
         st.sidebar.info(f"""
         **Current Selection ({data_label}):**
         - **{current_row['time'].strftime(time_format)}** 
         - Along: {current_row['v_along_mean']:.1f} ± {current_row['v_along_stderr']:.1f} cm/s
         - Cross: {current_row['u_cross_mean']:.1f} ± {current_row['u_cross_stderr']:.1f} cm/s
-        - N obs: {current_row['magnitude_count']:.0f}
+        {temp_text}- N obs: {current_row['magnitude_count']:.0f}
         """)
         
         # Performance metrics - collapsible
@@ -764,15 +875,31 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
             # Current vector information
             st.markdown(f"#### {freq_label} Current Details")
 
-            # Use 2 columns instead of 3 for better space utilization
-            col2a, col2b = st.columns(2)
-            with col2a:
-                st.metric("Along-shelf", f"{current_row['v_along_mean']:.1f} cm/s")
-                st.metric("Cross-shelf", f"{current_row['u_cross_mean']:.1f} cm/s")
-                st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
-            with col2b:
-                st.metric("U (East)", f"{current_row['u_mean']:.1f} cm/s")
-                st.metric("V (North)", f"{current_row['v_mean']:.1f} cm/s")
+            # Check if temperature data is available
+            has_temp = 'temp_mean' in current_row
+            
+            if has_temp:
+                # 3 columns layout when temperature is available
+                col2a, col2b, col2c = st.columns(3)
+                with col2a:
+                    st.metric("Along-shelf", f"{current_row['v_along_mean']:.1f} cm/s")
+                    st.metric("U (East)", f"{current_row['u_mean']:.1f} cm/s")
+                with col2b:
+                    st.metric("Cross-shelf", f"{current_row['u_cross_mean']:.1f} cm/s")
+                    st.metric("V (North)", f"{current_row['v_mean']:.1f} cm/s")
+                with col2c:
+                    st.metric("Temperature", f"{current_row['temp_mean']:.1f} °C")
+                    st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
+            else:
+                # 2 columns layout when no temperature data
+                col2a, col2b = st.columns(2)
+                with col2a:
+                    st.metric("Along-shelf", f"{current_row['v_along_mean']:.1f} cm/s")
+                    st.metric("Cross-shelf", f"{current_row['u_cross_mean']:.1f} cm/s")
+                    st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
+                with col2b:
+                    st.metric("U (East)", f"{current_row['u_mean']:.1f} cm/s")
+                    st.metric("V (North)", f"{current_row['v_mean']:.1f} cm/s")
 
         # Map section
         col_map1, col_map2, col_map3 = st.columns([1, 2, 1])
