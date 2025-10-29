@@ -74,7 +74,50 @@ st.markdown("""
             font-size: 0.9rem;
         }
     }
+    
+    /* Auto-fade notification styles */
+    [data-testid="stSuccess"], [data-testid="stInfo"] {
+        animation: autoFadeOut 6s ease-in-out forwards;
+    }
+    
+    @keyframes autoFadeOut {
+        0% { opacity: 1; visibility: visible; }
+        83% { opacity: 1; visibility: visible; }
+        100% { opacity: 0; visibility: hidden; height: 0; margin: 0; padding: 0; overflow: hidden; }
+    }
 </style>
+
+<script>
+document.addEventListener('keydown', function(event) {
+    // Only trigger on left or right arrow keys
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        // Prevent default browser behavior
+        event.preventDefault();
+        
+        // Find the appropriate navigation buttons
+        const leftButtons = document.querySelectorAll('[data-testid="baseButton-secondary"]:has([title="Previous time step"]), button[title="Previous time step"]');
+        const rightButtons = document.querySelectorAll('[data-testid="baseButton-secondary"]:has([title="Next time step"]), button[title="Next time step"]');
+        
+        if (event.key === 'ArrowLeft') {
+            // Click the left arrow button (previous time step)
+            for (let button of leftButtons) {
+                if (button.textContent.includes('◀') || button.title === 'Previous time step') {
+                    button.click();
+                    break;
+                }
+            }
+        } else if (event.key === 'ArrowRight') {
+            // Click the right arrow button (next time step)
+            for (let button of rightButtons) {
+                if (button.textContent.includes('▶') || button.title === 'Next time step') {
+                    button.click();
+                    break;
+                }
+            }
+        }
+    }
+});
+</script>
 """, unsafe_allow_html=True)
 
 # ============================================================================
@@ -583,13 +626,13 @@ def create_map_plot(df, selected_idx, base_map_bytes, freq_label="Monthly", arro
 # ============================================================================
 
 def show_monthly_mbon_page():
-    st.markdown("## 📅 Monthly HFR Surface Current Data")
+    st.markdown("## Monthly HFR Surface Current Data")
     
     # File upload or default path
     uploaded_file = st.sidebar.file_uploader(
-        "Upload MBON NetCDF file", 
+        "Upload a surface current time series NetCDF file", 
         type=['nc'],
-        help="Upload your MBON current dataset",
+        help="Upload a U & V time series dataset at a single location",
         key="mbon_monthly_upload"
     )
     
@@ -621,7 +664,7 @@ def show_monthly_mbon_page():
     show_data_interface(df_monthly, base_map_bytes, "Monthly", freq_label="Monthly")
 
 def show_weekly_mbon_page():
-    st.markdown("## 📊 Weekly HFR Surface Current Data")
+    st.markdown("## Weekly HFR Surface Current Data")
     
     # File upload or default path
     uploaded_file = st.sidebar.file_uploader(
@@ -659,7 +702,7 @@ def show_weekly_mbon_page():
     show_data_interface(df_weekly, base_map_bytes, "Weekly", freq_label="Weekly")
 
 def show_doppio_surface_page():
-    st.markdown("## 🌊 Weekly Surface DOPPIO Model Data")
+    st.markdown("## Weekly Surface DOPPIO Model Data")
     
     # Default DOPPIO files
     default_surface = "doppio_timeseries_surface.nc"
@@ -670,7 +713,7 @@ def show_doppio_surface_page():
     
     # Check for default files
     if Path(default_surface).exists() and Path(default_bottom).exists():
-        st.info(f"✅ Using default DOPPIO files: {default_surface} and {default_bottom}")
+        st.info(f"✅ Using default DOPPIO files: {default_surface} and {default_bottom}", )
         surface_file = default_surface
         bottom_file = default_bottom
     else:
@@ -724,7 +767,7 @@ def show_doppio_surface_page():
                        freq_label="Weekly", arrow_color=arrow_color, ylim=[-25, 25])
 
 def show_doppio_bottom_page():
-    st.markdown("## ⬇️ Weekly Bottom DOPPIO Model Data")
+    st.markdown("## Weekly Bottom DOPPIO Model Data")
     
     # Default DOPPIO files
     default_surface = "doppio_timeseries_surface.nc"
@@ -826,14 +869,38 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
     st.sidebar.subheader(f"{freq_label} Selection")
     
     if len(df_filtered) > 0:
-        selected_idx_filtered = st.sidebar.slider(
-            f"Select {freq_label.lower()}",
-            min_value=0,
-            max_value=len(df_filtered) - 1,
-            value=0,
-            help=f"Drag to explore {freq_label.lower()} patterns",
-            key=f"slider_{data_label.lower().replace(' ', '_')}"
-        )
+        # Initialize slider value from session state if it exists
+        slider_key = f"slider_{data_label.lower().replace(' ', '_')}"
+        if slider_key not in st.session_state:
+            st.session_state[slider_key] = 0
+        
+        # Ensure the session state value is within bounds
+        st.session_state[slider_key] = max(0, min(st.session_state[slider_key], len(df_filtered) - 1))
+        
+        # Arrow navigation buttons
+        col_left, col_slider, col_right = st.sidebar.columns([1, 6, 1])
+        
+        with col_left:
+            if st.button("◀", key=f"left_{data_label.lower().replace(' ', '_')}", 
+                        help="Previous time step", use_container_width=True):
+                if st.session_state[slider_key] > 0:
+                    st.session_state[slider_key] -= 1
+        
+        with col_right:
+            if st.button("▶", key=f"right_{data_label.lower().replace(' ', '_')}", 
+                        help="Next time step", use_container_width=True):
+                if st.session_state[slider_key] < len(df_filtered) - 1:
+                    st.session_state[slider_key] += 1
+        
+        with col_slider:
+            selected_idx_filtered = st.slider(
+                f"Select {freq_label.lower()}",
+                min_value=0,
+                max_value=len(df_filtered) - 1,
+                help=f"Drag to explore {freq_label.lower()} patterns",
+                key=slider_key,
+                label_visibility="collapsed"
+            )
         
         # Get the actual index in the full dataset
         selected_time = df_filtered.iloc[selected_idx_filtered]['time']
@@ -889,7 +956,7 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
                     st.metric("V (North)", f"{current_row['v_mean']:.1f} cm/s")
                 with col2c:
                     st.metric("Temperature", f"{current_row['temp_mean']:.1f} °C")
-                    st.metric("Observations", f"{current_row['magnitude_count']:.0f}")
+                    st.metric("Current Observations", f"{current_row['magnitude_count']:.0f}")
             else:
                 # 2 columns layout when no temperature data
                 col2a, col2b = st.columns(2)
@@ -916,10 +983,10 @@ def show_data_interface(df, base_map_bytes, data_label, freq_label="Monthly", ar
 # ============================================================================
 
 def main():
-    st.markdown("# 🌊 Ocean Current Multi-Viewer")
+    # st.markdown("# 🌊 Ocean Current Multi-Viewer")
     
     # Navigation in sidebar
-    st.sidebar.markdown("## 📋 Navigation")
+    st.sidebar.markdown("## Choose a Dataset")
     
     page = st.sidebar.selectbox(
         "Choose a page:",
