@@ -402,17 +402,12 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
                       annotation_text=f"Bottom Mean: {overall_bottom:.1f}°C",
                       annotation_position="right")
 
-    # Set x-axis range to span all datasets (use max time from any dataset)
-    all_times = []
-    if len(df_ghrsst_plot) > 0:
-        all_times.extend([df_ghrsst_plot['time'].min(), df_ghrsst_plot['time'].max()])
-    if len(df_surface_plot) > 0:
-        all_times.extend([df_surface_plot['time'].min(), df_surface_plot['time'].max()])
-    if len(df_bottom_plot) > 0:
-        all_times.extend([df_bottom_plot['time'].min(), df_bottom_plot['time'].max()])
+        # Set x-axis range to the Doppio bottom temperature data range
+    doppio_times = df_bottom_plot['time'].tolist()
+    
 
-    if all_times:
-        xaxis_range = [min(all_times), max(all_times)]
+    if doppio_times:
+        xaxis_range = [min(doppio_times), max(doppio_times)]
     else:
         xaxis_range = None
 

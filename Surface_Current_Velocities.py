@@ -60,7 +60,7 @@ def show_monthly_mbon_page():
         base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
     
     # Success message
-    st.success(f"✅ Loaded {len(df_monthly)} monthly means from {df_monthly['time'].min().strftime('%Y-%m')} to {df_monthly['time'].max().strftime('%Y-%m')}")
+    # st.success(f"✅ Loaded {len(df_monthly)} monthly means from {df_monthly['time'].min().strftime('%Y-%m')} to {df_monthly['time'].max().strftime('%Y-%m')}")
     
     show_data_interface(df_monthly, base_map_bytes, "Monthly", freq_label="Monthly")
 

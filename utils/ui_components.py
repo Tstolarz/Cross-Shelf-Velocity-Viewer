@@ -62,12 +62,12 @@ def apply_custom_css():
 
     /* Auto-fade notification styles */
     [data-testid="stSuccess"], [data-testid="stInfo"] {
-        animation: autoFadeOut 6s ease-in-out forwards;
+        animation: autoFadeOut 5s ease-in-out forwards;
     }
 
     @keyframes autoFadeOut {
         0% { opacity: 1; visibility: visible; }
-        83% { opacity: 1; visibility: visible; }
+        80% { opacity: 1; visibility: visible; }
         100% { opacity: 0; visibility: hidden; height: 0; margin: 0; padding: 0; overflow: hidden; }
     }
 </style>

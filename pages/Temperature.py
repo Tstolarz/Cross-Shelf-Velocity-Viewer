@@ -25,16 +25,16 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
     """Display temperature data interface with scrubbing and plots"""
 
     # Find common time range across all datasets
-    min_time = max(df_ghrsst['time'].min(), df_surface['time'].min(), df_bottom['time'].min())
-    max_time = min(df_ghrsst['time'].max(), df_surface['time'].max(), df_bottom['time'].max())
+    min_time = max(df_surface['time'].min(), df_bottom['time'].min())
+    max_time = min(df_surface['time'].max(), df_bottom['time'].max())
 
     # Sidebar: Time range selection
     st.sidebar.subheader("Time Range Selection")
     date_range = st.sidebar.date_input(
         "Select date range",
         value=(min_time.date(), max_time.date()),
-        min_value=df_ghrsst['time'].min().date(),
-        max_value=df_ghrsst['time'].max().date(),
+        min_value=df_surface['time'].min().date(),
+        max_value=df_surface['time'].max().date(),
         key=f"temp_date_range_{temporal_res}"
     )
 
@@ -205,11 +205,6 @@ def show_daily_temperature_page():
         first_row = df_ghrsst.iloc[0]
         base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
 
-    st.success(f"✅ Loaded daily temperature data: "
-               f"GHRSST ({len(df_ghrsst)} obs), "
-               f"Surface ({len(df_surface)} obs), "
-               f"Bottom ({len(df_bottom)} obs)")
-
     show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Daily")
 
 def show_weekly_temperature_page():
@@ -244,11 +239,6 @@ def show_weekly_temperature_page():
         first_row = df_ghrsst.iloc[0]
         base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
 
-    st.success(f"✅ Loaded weekly temperature data: "
-               f"GHRSST ({len(df_ghrsst)} obs), "
-               f"Surface ({len(df_surface)} obs), "
-               f"Bottom ({len(df_bottom)} obs)")
-
     show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Weekly")
 
 def show_monthly_temperature_page():
@@ -282,11 +272,6 @@ def show_monthly_temperature_page():
         # Create static base map
         first_row = df_ghrsst.iloc[0]
         base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
-
-    st.success(f"✅ Loaded monthly temperature data: "
-               f"GHRSST ({len(df_ghrsst)} obs), "
-               f"Surface ({len(df_surface)} obs), "
-               f"Bottom ({len(df_bottom)} obs)")
 
     show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Monthly")
 
