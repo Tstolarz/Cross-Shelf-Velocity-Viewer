@@ -402,6 +402,20 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
                       annotation_text=f"Bottom Mean: {overall_bottom:.1f}°C",
                       annotation_position="right")
 
+    # Set x-axis range to span all datasets (use max time from any dataset)
+    all_times = []
+    if len(df_ghrsst_plot) > 0:
+        all_times.extend([df_ghrsst_plot['time'].min(), df_ghrsst_plot['time'].max()])
+    if len(df_surface_plot) > 0:
+        all_times.extend([df_surface_plot['time'].min(), df_surface_plot['time'].max()])
+    if len(df_bottom_plot) > 0:
+        all_times.extend([df_bottom_plot['time'].min(), df_bottom_plot['time'].max()])
+
+    if all_times:
+        xaxis_range = [min(all_times), max(all_times)]
+    else:
+        xaxis_range = None
+
     # Update layout
     fig.update_layout(
         title=f"{freq_label} Temperature Data",
@@ -421,5 +435,9 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
         hovermode='x unified',
         margin=dict(t=60, b=40, l=60, r=20)
     )
+
+    # Set x-axis range if we have data
+    if xaxis_range:
+        fig.update_xaxes(range=xaxis_range)
 
     return fig
