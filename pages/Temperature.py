@@ -54,11 +54,22 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
         df_bottom_filt = df_bottom
         time_range = None
 
+    # Dataset visibility controls
+    st.sidebar.subheader("Display Options")
+    show_ghrsst = st.sidebar.checkbox("Show GHRSST Satellite SST", value=True, key=f"show_ghrsst_{temporal_res}")
+    show_surface = st.sidebar.checkbox("Show DOPPIO Surface", value=True, key=f"show_surface_{temporal_res}")
+    show_bottom = st.sidebar.checkbox("Show DOPPIO Bottom", value=True, key=f"show_bottom_{temporal_res}")
+
+    st.sidebar.markdown("---")
+
     # Create base time series (all three sources)
     base_ts_fig = create_temperature_timeseries(
         df_ghrsst_filt, df_surface_filt, df_bottom_filt,
         time_range=time_range,
-        freq_label=temporal_res
+        freq_label=temporal_res,
+        show_ghrsst=show_ghrsst,
+        show_surface=show_surface,
+        show_bottom=show_bottom
     )
 
     # Time scrubbing: Use GHRSST as reference
@@ -115,38 +126,36 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
         ts_fig = update_selection(base_ts_fig, selected_time)
         st.plotly_chart(ts_fig, use_container_width=True)
 
-        # Data values BELOW plot
+        # Data values BELOW plot - only show for visible datasets
         st.markdown("---")
         time_format = '%Y-%m' if temporal_res == "Monthly" else '%Y-%m-%d'
         st.markdown(f"### Data Values at {selected_time.strftime(time_format)}")
 
-        col1, col2, col3 = st.columns(3)
+        # Create columns dynamically based on which datasets are visible
+        visible_datasets = []
+        if show_ghrsst:
+            visible_datasets.append(('GHRSST Satellite SST', ghrsst_row))
+        if show_surface and surface_row is not None:
+            visible_datasets.append(('DOPPIO Surface', surface_row))
+        if show_bottom and bottom_row is not None:
+            visible_datasets.append(('DOPPIO Bottom', bottom_row))
 
-        with col1:
-            st.markdown("**GHRSST Satellite SST**")
-            st.metric("Temperature", f"{ghrsst_row['temp_mean']:.2f} °C",
-                     help=f"± {ghrsst_row['temp_stderr']:.2f} °C" if ghrsst_row['temp_stderr'] > 0 else "Pre-aggregated data")
-            st.caption(f"N = {ghrsst_row['temp_count']:.0f} observations")
+        if len(visible_datasets) == 0:
+            st.info("No datasets selected for display. Use the checkboxes in the sidebar to show data.")
+        else:
+            cols = st.columns(len(visible_datasets))
 
-        with col2:
-            st.markdown("**DOPPIO Surface**")
-            if surface_row is not None:
-                st.metric("Temperature", f"{surface_row['temp_mean']:.2f} °C",
-                         help=f"± {surface_row['temp_stderr']:.2f} °C")
-                st.caption(f"N = {surface_row['temp_count']:.0f} observations")
-                st.caption(f"Time: {surface_row['time'].strftime(time_format)}")
-            else:
-                st.warning("No data available")
-
-        with col3:
-            st.markdown("**DOPPIO Bottom**")
-            if bottom_row is not None:
-                st.metric("Temperature", f"{bottom_row['temp_mean']:.2f} °C",
-                         help=f"± {bottom_row['temp_stderr']:.2f} °C")
-                st.caption(f"N = {bottom_row['temp_count']:.0f} observations")
-                st.caption(f"Time: {bottom_row['time'].strftime(time_format)}")
-            else:
-                st.warning("No data available")
+            for idx, (col, (name, row)) in enumerate(zip(cols, visible_datasets)):
+                with col:
+                    st.markdown(f"**{name}**")
+                    if name == 'GHRSST Satellite SST':
+                        st.metric("Temperature", f"{row['temp_mean']:.2f} °C",
+                                 help=f"± {row['temp_stderr']:.2f} °C" if row['temp_stderr'] > 0 else "Pre-aggregated data")
+                    else:
+                        st.metric("Temperature", f"{row['temp_mean']:.2f} °C",
+                                 help=f"± {row['temp_stderr']:.2f} °C")
+                        st.caption(f"Time: {row['time'].strftime(time_format)}")
+                    st.caption(f"N = {row['temp_count']:.0f} observations")
 
         # Static location map
         st.markdown("---")

@@ -287,8 +287,9 @@ def create_map_plot(df, selected_idx, base_map_bytes, freq_label="Monthly", arro
     return final_buf
 
 @time_it("create_temperature_timeseries")
-def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=None, freq_label="Daily"):
-    """Create 3-row subplot with stacked temperature time series
+def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=None, freq_label="Daily",
+                                  show_ghrsst=True, show_surface=True, show_bottom=True):
+    """Create single overlay plot with all temperature time series
 
     Args:
         df_ghrsst: GHRSST satellite SST dataframe
@@ -296,9 +297,12 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
         df_bottom: DOPPIO bottom temperature dataframe
         time_range: Optional (start, end) tuple
         freq_label: Label for frequency (Daily, Weekly, Monthly)
+        show_ghrsst: Whether to show GHRSST satellite trace
+        show_surface: Whether to show DOPPIO surface trace
+        show_bottom: Whether to show DOPPIO bottom trace
 
     Returns:
-        Plotly figure with 3 stacked subplots
+        Plotly figure with single plot and 3 overlaid traces
     """
     # Filter dataframes if time_range is provided
     if time_range is not None:
@@ -310,135 +314,112 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
         df_surface_plot = df_surface
         df_bottom_plot = df_bottom
 
-    # Create 3-row subplot
-    fig = make_subplots(
-        rows=3, cols=1,
-        shared_xaxes=True,
-        subplot_titles=[
-            f'{freq_label} GHRSST Satellite SST',
-            f'{freq_label} DOPPIO Surface Temperature',
-            f'{freq_label} DOPPIO Bottom Temperature'
-        ],
-        vertical_spacing=0.08
-    )
+    # Create single plot figure
+    fig = go.Figure()
 
-    # Row 1: GHRSST Satellite (orange)
-    fig.add_trace(
-        go.Scatter(
-            x=df_ghrsst_plot['time'],
-            y=df_ghrsst_plot['temp_mean'],
-            mode='lines+markers',
-            name='GHRSST Satellite',
-            line=dict(color='orange', width=2),
-            marker=dict(size=4),
-            error_y=dict(
-                type='data',
-                array=df_ghrsst_plot['temp_stderr'],
-                visible=True,
-                color='rgba(255,165,0,0.3)',
-                thickness=1
-            ),
-            hovertemplate='%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
-        ),
-        row=1, col=1
-    )
+    # Add GHRSST Satellite trace (orange)
+    if show_ghrsst and len(df_ghrsst_plot) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=df_ghrsst_plot['time'],
+                y=df_ghrsst_plot['temp_mean'],
+                mode='lines+markers',
+                name='GHRSST Satellite SST',
+                line=dict(color='orange', width=2),
+                marker=dict(size=4),
+                error_y=dict(
+                    type='data',
+                    array=df_ghrsst_plot['temp_stderr'],
+                    visible=True,
+                    color='rgba(255,165,0,0.3)',
+                    thickness=1
+                ),
+                hovertemplate='<b>GHRSST Satellite</b><br>%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+            )
+        )
 
-    # Row 2: DOPPIO Surface (blue)
-    fig.add_trace(
-        go.Scatter(
-            x=df_surface_plot['time'],
-            y=df_surface_plot['temp_mean'],
-            mode='lines+markers',
-            name='DOPPIO Surface',
-            line=dict(color='blue', width=2),
-            marker=dict(size=4),
-            error_y=dict(
-                type='data',
-                array=df_surface_plot['temp_stderr'],
-                visible=True,
-                color='rgba(0,0,255,0.3)',
-                thickness=1
-            ),
-            hovertemplate='%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
-        ),
-        row=2, col=1
-    )
+    # Add DOPPIO Surface trace (blue)
+    if show_surface and len(df_surface_plot) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=df_surface_plot['time'],
+                y=df_surface_plot['temp_mean'],
+                mode='lines+markers',
+                name='DOPPIO Surface',
+                line=dict(color='blue', width=2),
+                marker=dict(size=4),
+                error_y=dict(
+                    type='data',
+                    array=df_surface_plot['temp_stderr'],
+                    visible=True,
+                    color='rgba(0,0,255,0.3)',
+                    thickness=1
+                ),
+                hovertemplate='<b>DOPPIO Surface</b><br>%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+            )
+        )
 
-    # Row 3: DOPPIO Bottom (red)
-    fig.add_trace(
-        go.Scatter(
-            x=df_bottom_plot['time'],
-            y=df_bottom_plot['temp_mean'],
-            mode='lines+markers',
-            name='DOPPIO Bottom',
-            line=dict(color='red', width=2),
-            marker=dict(size=4),
-            error_y=dict(
-                type='data',
-                array=df_bottom_plot['temp_stderr'],
-                visible=True,
-                color='rgba(255,0,0,0.3)',
-                thickness=1
-            ),
-            hovertemplate='%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
-        ),
-        row=3, col=1
-    )
+    # Add DOPPIO Bottom trace (red)
+    if show_bottom and len(df_bottom_plot) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=df_bottom_plot['time'],
+                y=df_bottom_plot['temp_mean'],
+                mode='lines+markers',
+                name='DOPPIO Bottom',
+                line=dict(color='red', width=2),
+                marker=dict(size=4),
+                error_y=dict(
+                    type='data',
+                    array=df_bottom_plot['temp_stderr'],
+                    visible=True,
+                    color='rgba(255,0,0,0.3)',
+                    thickness=1
+                ),
+                hovertemplate='<b>DOPPIO Bottom</b><br>%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+            )
+        )
 
-    # Add overall means as horizontal lines
-    overall_ghrsst = df_ghrsst_plot['temp_mean'].mean()
-    overall_surface = df_surface_plot['temp_mean'].mean()
-    overall_bottom = df_bottom_plot['temp_mean'].mean()
+    # Add mean lines for visible traces
+    if show_ghrsst and len(df_ghrsst_plot) > 0:
+        overall_ghrsst = df_ghrsst_plot['temp_mean'].mean()
+        fig.add_hline(y=overall_ghrsst, line_dash="dash", line_color="orange",
+                      line_width=1, opacity=0.5,
+                      annotation_text=f"GHRSST Mean: {overall_ghrsst:.1f}°C",
+                      annotation_position="right")
 
-    fig.add_hline(y=overall_ghrsst, line_dash="dash", line_color="orange",
-                  line_width=1, opacity=0.7, row=1, col=1)
-    fig.add_hline(y=overall_surface, line_dash="dash", line_color="blue",
-                  line_width=1, opacity=0.7, row=2, col=1)
-    fig.add_hline(y=overall_bottom, line_dash="dash", line_color="red",
-                  line_width=1, opacity=0.7, row=3, col=1)
+    if show_surface and len(df_surface_plot) > 0:
+        overall_surface = df_surface_plot['temp_mean'].mean()
+        fig.add_hline(y=overall_surface, line_dash="dash", line_color="blue",
+                      line_width=1, opacity=0.5,
+                      annotation_text=f"Surface Mean: {overall_surface:.1f}°C",
+                      annotation_position="right")
 
-    # Add annotations for mean values
-    fig.add_annotation(
-        x=1.0, y=1.0, xref="x domain", yref="y domain",
-        text=f"Mean: {overall_ghrsst:.1f} °C",
-        showarrow=False,
-        xanchor='right', yanchor='top',
-        bgcolor='rgba(255, 228, 196, 0.8)',
-        bordercolor='orange', borderwidth=1,
-        font=dict(size=10), row=1, col=1
-    )
-
-    fig.add_annotation(
-        x=1.0, y=1.0, xref="x2 domain", yref="y2 domain",
-        text=f"Mean: {overall_surface:.1f} °C",
-        showarrow=False,
-        xanchor='right', yanchor='top',
-        bgcolor='rgba(173, 216, 230, 0.8)',
-        bordercolor='blue', borderwidth=1,
-        font=dict(size=10), row=2, col=1
-    )
-
-    fig.add_annotation(
-        x=1.0, y=1.0, xref="x3 domain", yref="y3 domain",
-        text=f"Mean: {overall_bottom:.1f} °C",
-        showarrow=False,
-        xanchor='right', yanchor='top',
-        bgcolor='rgba(255, 182, 193, 0.8)',
-        bordercolor='red', borderwidth=1,
-        font=dict(size=10), row=3, col=1
-    )
+    if show_bottom and len(df_bottom_plot) > 0:
+        overall_bottom = df_bottom_plot['temp_mean'].mean()
+        fig.add_hline(y=overall_bottom, line_dash="dash", line_color="red",
+                      line_width=1, opacity=0.5,
+                      annotation_text=f"Bottom Mean: {overall_bottom:.1f}°C",
+                      annotation_position="right")
 
     # Update layout
-    fig.update_yaxes(title_text="Temperature (°C)", row=1, col=1)
-    fig.update_yaxes(title_text="Temperature (°C)", row=2, col=1)
-    fig.update_yaxes(title_text="Temperature (°C)", row=3, col=1)
-    fig.update_xaxes(title_text="Time", row=3, col=1)
-
     fig.update_layout(
-        height=750,
+        title=f"{freq_label} Temperature Data",
+        xaxis_title="Time",
+        yaxis_title="Temperature (°C)",
+        height=600,
         showlegend=True,
+        legend=dict(
+            x=0.02,
+            y=0.98,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='gray',
+            borderwidth=1
+        ),
         hovermode='x unified',
-        margin=dict(t=40, b=40, l=60, r=20)
+        margin=dict(t=60, b=40, l=60, r=20)
     )
 
     return fig
