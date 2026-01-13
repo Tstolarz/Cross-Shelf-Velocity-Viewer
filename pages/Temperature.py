@@ -258,13 +258,13 @@ def show_monthly_temperature_page():
 
         # Load and resample DOPPIO data to monthly
         if Path(doppio_surface_path).exists():
-            df_surface = load_doppio_single_layer(doppio_surface_path, 'surface', resample_freq='M')
+            df_surface = load_doppio_single_layer(doppio_surface_path, 'surface', resample_freq='MS')
         else:
             st.warning("DOPPIO surface file not found")
             df_surface = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
         if Path(doppio_bottom_path).exists():
-            df_bottom = load_doppio_single_layer(doppio_bottom_path, 'bottom', resample_freq='M')
+            df_bottom = load_doppio_single_layer(doppio_bottom_path, 'bottom', resample_freq='MS')
         else:
             st.warning("DOPPIO bottom file not found")
             df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])

@@ -53,7 +53,7 @@ def show_monthly_mbon_page():
     
     # Load monthly data
     with st.spinner("Loading and processing monthly HFR Surface Current data..."):
-        df_monthly = load_mbon_data(nc_path, resample_freq='M')
+        df_monthly = load_mbon_data(nc_path, resample_freq='MS')
         
         # Create base map once (cached)
         first_row = df_monthly.iloc[0]

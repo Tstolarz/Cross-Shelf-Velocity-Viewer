@@ -4,8 +4,8 @@ import pandas as pd
 import xarray as xr
 
 @st.cache_data
-def load_mbon_data(nc_path, resample_freq='M'):
-    """Load and preprocess the MBON dataset to specified frequency (M=monthly, W=weekly)"""
+def load_mbon_data(nc_path, resample_freq='MS'):
+    """Load and preprocess the MBON dataset to specified frequency (MS=monthly, W=weekly)"""
     ds = xr.open_dataset(nc_path)
 
     # Convert to pandas for easier handling
@@ -80,7 +80,11 @@ def load_mbon_data(nc_path, resample_freq='M'):
 
 @st.cache_data
 def load_doppio_single_layer(nc_path, layer_name, resample_freq='W'):
-    """Load and preprocess a single DOPPIO layer (surface or bottom)"""
+    """Load and preprocess a single DOPPIO layer (surface or bottom)
+
+    Args:
+        resample_freq: 'D' (daily), 'W' (weekly), 'MS' (monthly-start)
+    """
     ds = xr.open_dataset(nc_path)
 
     # Create dataframe
