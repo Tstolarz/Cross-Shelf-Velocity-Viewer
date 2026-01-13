@@ -1,0 +1,309 @@
+import streamlit as st
+import pandas as pd
+from datetime import timedelta
+from pathlib import Path
+
+# Import from parent directory utils
+import sys
+sys.path.append('..')
+from utils.data_loading import load_ghrsst_data, load_doppio_single_layer
+from utils.plotting import create_temperature_timeseries, update_selection, create_base_map
+from utils.ui_components import apply_custom_css
+
+# Page config
+st.set_page_config(
+    page_title="Temperature Data",
+    page_icon="🌡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Apply custom CSS styling and keyboard navigation
+apply_custom_css()
+
+def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, temporal_res):
+    """Display temperature data interface with scrubbing and plots"""
+
+    # Find common time range across all datasets
+    min_time = max(df_ghrsst['time'].min(), df_surface['time'].min(), df_bottom['time'].min())
+    max_time = min(df_ghrsst['time'].max(), df_surface['time'].max(), df_bottom['time'].max())
+
+    # Sidebar: Time range selection
+    st.sidebar.subheader("Time Range Selection")
+    date_range = st.sidebar.date_input(
+        "Select date range",
+        value=(min_time.date(), max_time.date()),
+        min_value=df_ghrsst['time'].min().date(),
+        max_value=df_ghrsst['time'].max().date(),
+        key=f"temp_date_range_{temporal_res}"
+    )
+
+    if len(date_range) == 2:
+        start_date = pd.Timestamp(date_range[0])
+        end_date = pd.Timestamp(date_range[1]) + timedelta(days=31)
+
+        # Filter all datasets to common range
+        df_ghrsst_filt = df_ghrsst[(df_ghrsst['time'] >= start_date) & (df_ghrsst['time'] < end_date)]
+        df_surface_filt = df_surface[(df_surface['time'] >= start_date) & (df_surface['time'] < end_date)]
+        df_bottom_filt = df_bottom[(df_bottom['time'] >= start_date) & (df_bottom['time'] < end_date)]
+
+        time_range = (start_date, end_date)
+    else:
+        df_ghrsst_filt = df_ghrsst
+        df_surface_filt = df_surface
+        df_bottom_filt = df_bottom
+        time_range = None
+
+    # Create base time series (all three sources)
+    base_ts_fig = create_temperature_timeseries(
+        df_ghrsst_filt, df_surface_filt, df_bottom_filt,
+        time_range=time_range,
+        freq_label=temporal_res
+    )
+
+    # Time scrubbing: Use GHRSST as reference
+    st.sidebar.subheader(f"{temporal_res} Selection")
+
+    if len(df_ghrsst_filt) > 0:
+        slider_key = f"temp_slider_{temporal_res.lower()}"
+        if slider_key not in st.session_state:
+            st.session_state[slider_key] = 0
+
+        st.session_state[slider_key] = max(0, min(st.session_state[slider_key], len(df_ghrsst_filt) - 1))
+
+        # Arrow navigation
+        col_left, col_slider, col_right = st.sidebar.columns([1, 6, 1])
+
+        with col_left:
+            if st.button("◀", key=f"temp_left_{temporal_res}",
+                        help="Previous time step", use_container_width=True):
+                if st.session_state[slider_key] > 0:
+                    st.session_state[slider_key] -= 1
+
+        with col_right:
+            if st.button("▶", key=f"temp_right_{temporal_res}",
+                        help="Next time step", use_container_width=True):
+                if st.session_state[slider_key] < len(df_ghrsst_filt) - 1:
+                    st.session_state[slider_key] += 1
+
+        with col_slider:
+            selected_idx = st.slider(
+                f"Select {temporal_res.lower()}",
+                min_value=0,
+                max_value=len(df_ghrsst_filt) - 1,
+                key=slider_key,
+                label_visibility="collapsed"
+            )
+
+        # Get current selection
+        selected_time = df_ghrsst_filt.iloc[selected_idx]['time']
+
+        # Find matching rows in all datasets (closest time)
+        ghrsst_row = df_ghrsst_filt.iloc[selected_idx]
+
+        if len(df_surface_filt) > 0:
+            surface_row = df_surface_filt.iloc[(df_surface_filt['time'] - selected_time).abs().argmin()]
+        else:
+            surface_row = None
+
+        if len(df_bottom_filt) > 0:
+            bottom_row = df_bottom_filt.iloc[(df_bottom_filt['time'] - selected_time).abs().argmin()]
+        else:
+            bottom_row = None
+
+        # Time series plot (full width)
+        ts_fig = update_selection(base_ts_fig, selected_time)
+        st.plotly_chart(ts_fig, use_container_width=True)
+
+        # Data values BELOW plot
+        st.markdown("---")
+        time_format = '%Y-%m' if temporal_res == "Monthly" else '%Y-%m-%d'
+        st.markdown(f"### Data Values at {selected_time.strftime(time_format)}")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.markdown("**GHRSST Satellite SST**")
+            st.metric("Temperature", f"{ghrsst_row['temp_mean']:.2f} °C",
+                     help=f"± {ghrsst_row['temp_stderr']:.2f} °C" if ghrsst_row['temp_stderr'] > 0 else "Pre-aggregated data")
+            st.caption(f"N = {ghrsst_row['temp_count']:.0f} observations")
+
+        with col2:
+            st.markdown("**DOPPIO Surface**")
+            if surface_row is not None:
+                st.metric("Temperature", f"{surface_row['temp_mean']:.2f} °C",
+                         help=f"± {surface_row['temp_stderr']:.2f} °C")
+                st.caption(f"N = {surface_row['temp_count']:.0f} observations")
+                st.caption(f"Time: {surface_row['time'].strftime(time_format)}")
+            else:
+                st.warning("No data available")
+
+        with col3:
+            st.markdown("**DOPPIO Bottom**")
+            if bottom_row is not None:
+                st.metric("Temperature", f"{bottom_row['temp_mean']:.2f} °C",
+                         help=f"± {bottom_row['temp_stderr']:.2f} °C")
+                st.caption(f"N = {bottom_row['temp_count']:.0f} observations")
+                st.caption(f"Time: {bottom_row['time'].strftime(time_format)}")
+            else:
+                st.warning("No data available")
+
+        # Static location map
+        st.markdown("---")
+        st.markdown("### Measurement Location (MBON3)")
+
+        col_map1, col_map2, col_map3 = st.columns([1, 2, 1])
+        with col_map2:
+            st.image(base_map_bytes, use_container_width=True)
+            st.caption(f"Location: {ghrsst_row['lat_mean']:.4f}°N, {abs(ghrsst_row['lon_mean']):.4f}°W")
+
+    else:
+        st.warning("No data available for the selected time range.")
+
+# ============================================================================
+# PAGE FUNCTIONS
+# ============================================================================
+
+def show_daily_temperature_page():
+    st.markdown("## Daily Temperature Data")
+
+    with st.spinner("Loading daily temperature data..."):
+        ghrsst_path = "ghrsst_MBON3_daily.nc"
+        doppio_surface_path = "doppio_timeseries_surface.nc"
+        doppio_bottom_path = "doppio_timeseries_bottom.nc"
+
+        if not Path(ghrsst_path).exists():
+            st.error(f"GHRSST daily file not found: {ghrsst_path}")
+            st.stop()
+
+        # Load GHRSST data
+        df_ghrsst = load_ghrsst_data(ghrsst_path)
+
+        # Load and resample DOPPIO data to daily
+        if Path(doppio_surface_path).exists():
+            df_surface = load_doppio_single_layer(doppio_surface_path, 'surface', resample_freq='D')
+        else:
+            st.warning("DOPPIO surface file not found")
+            df_surface = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        if Path(doppio_bottom_path).exists():
+            df_bottom = load_doppio_single_layer(doppio_bottom_path, 'bottom', resample_freq='D')
+        else:
+            st.warning("DOPPIO bottom file not found")
+            df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        # Create static base map
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+
+    st.success(f"✅ Loaded daily temperature data: "
+               f"GHRSST ({len(df_ghrsst)} obs), "
+               f"Surface ({len(df_surface)} obs), "
+               f"Bottom ({len(df_bottom)} obs)")
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Daily")
+
+def show_weekly_temperature_page():
+    st.markdown("## Weekly Temperature Data")
+
+    with st.spinner("Loading weekly temperature data..."):
+        ghrsst_path = "ghrsst_MBON3_weekly.nc"
+        doppio_surface_path = "doppio_timeseries_surface.nc"
+        doppio_bottom_path = "doppio_timeseries_bottom.nc"
+
+        if not Path(ghrsst_path).exists():
+            st.error(f"GHRSST weekly file not found: {ghrsst_path}")
+            st.stop()
+
+        # Load GHRSST data
+        df_ghrsst = load_ghrsst_data(ghrsst_path)
+
+        # Load and resample DOPPIO data to weekly
+        if Path(doppio_surface_path).exists():
+            df_surface = load_doppio_single_layer(doppio_surface_path, 'surface', resample_freq='W')
+        else:
+            st.warning("DOPPIO surface file not found")
+            df_surface = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        if Path(doppio_bottom_path).exists():
+            df_bottom = load_doppio_single_layer(doppio_bottom_path, 'bottom', resample_freq='W')
+        else:
+            st.warning("DOPPIO bottom file not found")
+            df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        # Create static base map
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+
+    st.success(f"✅ Loaded weekly temperature data: "
+               f"GHRSST ({len(df_ghrsst)} obs), "
+               f"Surface ({len(df_surface)} obs), "
+               f"Bottom ({len(df_bottom)} obs)")
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Weekly")
+
+def show_monthly_temperature_page():
+    st.markdown("## Monthly Temperature Data")
+
+    with st.spinner("Loading monthly temperature data..."):
+        ghrsst_path = "ghrsst_MBON3_monthly.nc"
+        doppio_surface_path = "doppio_timeseries_surface.nc"
+        doppio_bottom_path = "doppio_timeseries_bottom.nc"
+
+        if not Path(ghrsst_path).exists():
+            st.error(f"GHRSST monthly file not found: {ghrsst_path}")
+            st.stop()
+
+        # Load GHRSST data
+        df_ghrsst = load_ghrsst_data(ghrsst_path)
+
+        # Load and resample DOPPIO data to monthly
+        if Path(doppio_surface_path).exists():
+            df_surface = load_doppio_single_layer(doppio_surface_path, 'surface', resample_freq='M')
+        else:
+            st.warning("DOPPIO surface file not found")
+            df_surface = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        if Path(doppio_bottom_path).exists():
+            df_bottom = load_doppio_single_layer(doppio_bottom_path, 'bottom', resample_freq='M')
+        else:
+            st.warning("DOPPIO bottom file not found")
+            df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
+
+        # Create static base map
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+
+    st.success(f"✅ Loaded monthly temperature data: "
+               f"GHRSST ({len(df_ghrsst)} obs), "
+               f"Surface ({len(df_surface)} obs), "
+               f"Bottom ({len(df_bottom)} obs)")
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Monthly")
+
+# ============================================================================
+# MAIN APPLICATION
+# ============================================================================
+
+def main():
+    # Navigation in sidebar
+    st.sidebar.markdown("## Choose Temporal Resolution")
+
+    temporal_resolution = st.sidebar.selectbox(
+        "Select temporal resolution:",
+        ["Daily Temperature", "Weekly Temperature", "Monthly Temperature"],
+        help="Choose the temporal aggregation for temperature data"
+    )
+
+    st.sidebar.markdown("---")
+
+    # Route to appropriate page
+    if temporal_resolution == "Daily Temperature":
+        show_daily_temperature_page()
+    elif temporal_resolution == "Weekly Temperature":
+        show_weekly_temperature_page()
+    elif temporal_resolution == "Monthly Temperature":
+        show_monthly_temperature_page()
+
+if __name__ == "__main__":
+    main()
