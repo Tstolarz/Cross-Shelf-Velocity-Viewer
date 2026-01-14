@@ -6,7 +6,7 @@ from pathlib import Path
 # Import from parent directory utils
 import sys
 sys.path.append('..')
-from utils.data_loading import load_ghrsst_data, load_doppio_single_layer
+from utils.data_loading import load_ghrsst_data, load_doppio_single_layer, load_ocim2_data
 from utils.plotting import create_temperature_timeseries, update_selection, create_base_map
 from utils.ui_components import apply_custom_css
 
@@ -21,7 +21,7 @@ st.set_page_config(
 # Apply custom CSS styling and keyboard navigation
 apply_custom_css()
 
-def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, temporal_res):
+def show_temperature_interface(df_ghrsst, df_surface, df_bottom, df_ocim2, base_map_bytes, temporal_res):
     """Display temperature data interface with scrubbing and plots"""
 
     # Find common time range across all datasets
@@ -46,12 +46,14 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
         df_ghrsst_filt = df_ghrsst[(df_ghrsst['time'] >= start_date) & (df_ghrsst['time'] < end_date)]
         df_surface_filt = df_surface[(df_surface['time'] >= start_date) & (df_surface['time'] < end_date)]
         df_bottom_filt = df_bottom[(df_bottom['time'] >= start_date) & (df_bottom['time'] < end_date)]
+        df_ocim2_filt = df_ocim2[(df_ocim2['time'] >= start_date) & (df_ocim2['time'] < end_date)]
 
         time_range = (start_date, end_date)
     else:
         df_ghrsst_filt = df_ghrsst
         df_surface_filt = df_surface
         df_bottom_filt = df_bottom
+        df_ocim2_filt = df_ocim2
         time_range = None
 
     # Dataset visibility controls
@@ -59,17 +61,19 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
     show_ghrsst = st.sidebar.checkbox("Show GHRSST Satellite SST", value=True, key=f"show_ghrsst_{temporal_res}")
     show_surface = st.sidebar.checkbox("Show DOPPIO Surface", value=True, key=f"show_surface_{temporal_res}")
     show_bottom = st.sidebar.checkbox("Show DOPPIO Bottom", value=True, key=f"show_bottom_{temporal_res}")
+    show_ocim2 = st.sidebar.checkbox("Show OCIM2 Buoy", value=True, key=f"show_ocim2_{temporal_res}")
 
     st.sidebar.markdown("---")
 
-    # Create base time series (all three sources)
+    # Create base time series (all four sources)
     base_ts_fig = create_temperature_timeseries(
-        df_ghrsst_filt, df_surface_filt, df_bottom_filt,
+        df_ghrsst_filt, df_surface_filt, df_bottom_filt, df_ocim2_filt,
         time_range=time_range,
         freq_label=temporal_res,
         show_ghrsst=show_ghrsst,
         show_surface=show_surface,
-        show_bottom=show_bottom
+        show_bottom=show_bottom,
+        show_ocim2=show_ocim2
     )
 
     # Time scrubbing: Use GHRSST as reference
@@ -122,6 +126,11 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
         else:
             bottom_row = None
 
+        if len(df_ocim2_filt) > 0:
+            ocim2_row = df_ocim2_filt.iloc[(df_ocim2_filt['time'] - selected_time).abs().argmin()]
+        else:
+            ocim2_row = None
+
         # Time series plot (full width)
         ts_fig = update_selection(base_ts_fig, selected_time)
         st.plotly_chart(ts_fig, use_container_width=True)
@@ -139,6 +148,8 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
             visible_datasets.append(('DOPPIO Surface', surface_row))
         if show_bottom and bottom_row is not None:
             visible_datasets.append(('DOPPIO Bottom', bottom_row))
+        if show_ocim2 and ocim2_row is not None:
+            visible_datasets.append(('OCIM2 Buoy', ocim2_row))
 
         if len(visible_datasets) == 0:
             st.info("No datasets selected for display. Use the checkboxes in the sidebar to show data.")
@@ -159,12 +170,12 @@ def show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes,
 
         # Static location map
         st.markdown("---")
-        st.markdown("### Measurement Location (MBON3)")
+        st.markdown("### Measurement Locations")
 
         col_map1, col_map2, col_map3 = st.columns([1, 2, 1])
         with col_map2:
             st.image(base_map_bytes, use_container_width=True)
-            st.caption(f"Location: {ghrsst_row['lat_mean']:.4f}°N, {abs(ghrsst_row['lon_mean']):.4f}°W")
+            st.caption(f"MBON3: {ghrsst_row['lat_mean']:.4f}°N, {abs(ghrsst_row['lon_mean']):.4f}°W | OCIM2 Buoy: 38.328°N, 75.091°W")
 
     else:
         st.warning("No data available for the selected time range.")
@@ -180,6 +191,7 @@ def show_daily_temperature_page():
         ghrsst_path = "ghrsst_MBON3_daily.nc"
         doppio_surface_path = "doppio_timeseries_surface.nc"
         doppio_bottom_path = "doppio_timeseries_bottom.nc"
+        ocim2_path = "/Users/timothystolarz/python_projects/plotting_tools/outputs/ocim2_combined_hourly.csv"
 
         if not Path(ghrsst_path).exists():
             st.error(f"GHRSST daily file not found: {ghrsst_path}")
@@ -201,11 +213,23 @@ def show_daily_temperature_page():
             st.warning("DOPPIO bottom file not found")
             df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-        # Create static base map
-        first_row = df_ghrsst.iloc[0]
-        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+        # Load OCIM2 buoy data (resample to daily)
+        if Path(ocim2_path).exists():
+            df_ocim2 = load_ocim2_data(ocim2_path, resample_freq='D')
+        else:
+            st.warning("OCIM2 buoy file not found")
+            df_ocim2 = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Daily")
+        # Create static base map with both MBON3 and OCIM2 locations
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(
+            float(first_row['lat_mean']),
+            float(first_row['lon_mean']),
+            ocim2_lat=38.328,
+            ocim2_lon=-75.091
+        )
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, df_ocim2, base_map_bytes, "Daily")
 
 def show_weekly_temperature_page():
     st.markdown("## Weekly Temperature Data")
@@ -214,6 +238,7 @@ def show_weekly_temperature_page():
         ghrsst_path = "ghrsst_MBON3_weekly.nc"
         doppio_surface_path = "doppio_timeseries_surface.nc"
         doppio_bottom_path = "doppio_timeseries_bottom.nc"
+        ocim2_path = "/Users/timothystolarz/python_projects/plotting_tools/outputs/ocim2_combined_hourly.csv"
 
         if not Path(ghrsst_path).exists():
             st.error(f"GHRSST weekly file not found: {ghrsst_path}")
@@ -235,11 +260,23 @@ def show_weekly_temperature_page():
             st.warning("DOPPIO bottom file not found")
             df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-        # Create static base map
-        first_row = df_ghrsst.iloc[0]
-        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+        # Load OCIM2 buoy data (resample to weekly)
+        if Path(ocim2_path).exists():
+            df_ocim2 = load_ocim2_data(ocim2_path, resample_freq='W')
+        else:
+            st.warning("OCIM2 buoy file not found")
+            df_ocim2 = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Weekly")
+        # Create static base map with both MBON3 and OCIM2 locations
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(
+            float(first_row['lat_mean']),
+            float(first_row['lon_mean']),
+            ocim2_lat=38.328,
+            ocim2_lon=-75.091
+        )
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, df_ocim2, base_map_bytes, "Weekly")
 
 def show_monthly_temperature_page():
     st.markdown("## Monthly Temperature Data")
@@ -248,6 +285,7 @@ def show_monthly_temperature_page():
         ghrsst_path = "ghrsst_MBON3_monthly.nc"
         doppio_surface_path = "doppio_timeseries_surface.nc"
         doppio_bottom_path = "doppio_timeseries_bottom.nc"
+        ocim2_path = "/Users/timothystolarz/python_projects/plotting_tools/outputs/ocim2_combined_hourly.csv"
 
         if not Path(ghrsst_path).exists():
             st.error(f"GHRSST monthly file not found: {ghrsst_path}")
@@ -269,11 +307,23 @@ def show_monthly_temperature_page():
             st.warning("DOPPIO bottom file not found")
             df_bottom = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-        # Create static base map
-        first_row = df_ghrsst.iloc[0]
-        base_map_bytes = create_base_map(float(first_row['lat_mean']), float(first_row['lon_mean']))
+        # Load OCIM2 buoy data (resample to monthly)
+        if Path(ocim2_path).exists():
+            df_ocim2 = load_ocim2_data(ocim2_path, resample_freq='MS')
+        else:
+            st.warning("OCIM2 buoy file not found")
+            df_ocim2 = pd.DataFrame(columns=['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr'])
 
-    show_temperature_interface(df_ghrsst, df_surface, df_bottom, base_map_bytes, "Monthly")
+        # Create static base map with both MBON3 and OCIM2 locations
+        first_row = df_ghrsst.iloc[0]
+        base_map_bytes = create_base_map(
+            float(first_row['lat_mean']),
+            float(first_row['lon_mean']),
+            ocim2_lat=38.328,
+            ocim2_lon=-75.091
+        )
+
+    show_temperature_interface(df_ghrsst, df_surface, df_bottom, df_ocim2, base_map_bytes, "Monthly")
 
 # ============================================================================
 # MAIN APPLICATION

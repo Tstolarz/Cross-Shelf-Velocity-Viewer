@@ -194,3 +194,52 @@ def load_ghrsst_data(nc_path):
     df = df[['time', 'temp_mean', 'temp_std', 'temp_count', 'temp_stderr', 'lat_mean', 'lon_mean']]
 
     return df
+
+@st.cache_data
+def load_ocim2_data(csv_path, resample_freq='D'):
+    """Load OCIM2 buoy water temperature data
+
+    Args:
+        csv_path: Path to processed OCIM2 hourly CSV file
+        resample_freq: 'D' (daily), 'W' (weekly), 'MS' (monthly-start)
+
+    Returns:
+        DataFrame with columns: time, temp_mean, temp_std, temp_count,
+                                temp_stderr, lat_mean, lon_mean
+    """
+    # Load hourly buoy data
+    df = pd.read_csv(csv_path, parse_dates=['datetime'], index_col='datetime')
+
+    # Extract water temperature column (WTMP in NDBC data)
+    if 'WTMP' not in df.columns:
+        raise ValueError("WTMP (water temperature) column not found in OCIM2 data")
+
+    # Keep only temperature column
+    df_temp = df[['WTMP']].copy()
+
+    # Remove NaN values
+    df_temp = df_temp.dropna()
+
+    # Resample to desired frequency
+    agg_dict = {
+        'WTMP': ['mean', 'std', 'count']
+    }
+
+    resampled = df_temp.resample(resample_freq).agg(agg_dict)
+
+    # Flatten column names
+    resampled.columns = ['temp_mean', 'temp_std', 'temp_count']
+    resampled.reset_index(inplace=True)
+    resampled.rename(columns={'datetime': 'time'}, inplace=True)
+
+    # Calculate standard error
+    resampled['temp_stderr'] = resampled['temp_std'] / np.sqrt(resampled['temp_count'])
+
+    # Add location (OCIM2 buoy in Delaware Bay)
+    resampled['lat_mean'] = 38.328
+    resampled['lon_mean'] = -75.091
+
+    # Keep only rows with data
+    resampled = resampled[resampled['temp_count'] > 0].copy()
+
+    return resampled

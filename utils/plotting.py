@@ -135,8 +135,15 @@ def update_selection(base_fig, selected_time):
 
 @st.cache_data
 @time_it("create_base_map")
-def create_base_map(lat, lon):
-    """Create base map once and cache it"""
+def create_base_map(lat, lon, ocim2_lat=None, ocim2_lon=None):
+    """Create base map once and cache it
+
+    Args:
+        lat: Latitude of primary location (MBON3)
+        lon: Longitude of primary location (MBON3)
+        ocim2_lat: Optional latitude of OCIM2 buoy
+        ocim2_lon: Optional longitude of OCIM2 buoy
+    """
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
@@ -145,8 +152,18 @@ def create_base_map(lat, lon):
     # Create figure with PlateCarree projection for consistency
     fig, ax = plt.subplots(figsize=(10, 8), subplot_kw={'projection': ccrs.PlateCarree()})
 
-    # Set extent around the location
-    extent = [lon - 1.5, lon + 1.5, lat - 1.0, lat + 1.0]
+    # Set extent to include both locations if OCIM2 is provided
+    if ocim2_lat is not None and ocim2_lon is not None:
+        # Calculate extent to show both points
+        all_lats = [lat, ocim2_lat]
+        all_lons = [lon, ocim2_lon]
+        center_lat = (max(all_lats) + min(all_lats)) / 2
+        center_lon = (max(all_lons) + min(all_lons)) / 2
+        extent = [center_lon - 1.5, center_lon + 1.5, center_lat - 1.0, center_lat + 1.0]
+    else:
+        # Original extent around single location
+        extent = [lon - 1.5, lon + 1.5, lat - 1.0, lat + 1.0]
+
     ax.set_extent(extent, crs=ccrs.PlateCarree())
 
     # Add map features
@@ -161,9 +178,17 @@ def create_base_map(lat, lon):
     gl.top_labels = False
     gl.right_labels = False
 
-    # Plot location point (static)
+    # Plot primary location point (MBON3 - red)
     ax.scatter(lon, lat, color='red', s=100, zorder=5,
-               transform=ccrs.PlateCarree())
+               transform=ccrs.PlateCarree(), label='MBON3')
+
+    # Plot OCIM2 buoy location (lime) if provided
+    if ocim2_lat is not None and ocim2_lon is not None:
+        ax.scatter(ocim2_lon, ocim2_lat, color='lime', s=100, zorder=5,
+                   transform=ccrs.PlateCarree(), label='OCIM2 Buoy')
+
+        # Add legend
+        ax.legend(loc='upper right', framealpha=0.9)
 
     # Convert to image
     buf = BytesIO()
@@ -287,32 +312,39 @@ def create_map_plot(df, selected_idx, base_map_bytes, freq_label="Monthly", arro
     return final_buf
 
 @time_it("create_temperature_timeseries")
-def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=None, freq_label="Daily",
-                                  show_ghrsst=True, show_surface=True, show_bottom=True):
+def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=None, time_range=None, freq_label="Daily",
+                                  show_ghrsst=True, show_surface=True, show_bottom=True, show_ocim2=True):
     """Create single overlay plot with all temperature time series
 
     Args:
         df_ghrsst: GHRSST satellite SST dataframe
         df_surface: DOPPIO surface temperature dataframe
         df_bottom: DOPPIO bottom temperature dataframe
+        df_ocim2: OCIM2 buoy water temperature dataframe (optional)
         time_range: Optional (start, end) tuple
         freq_label: Label for frequency (Daily, Weekly, Monthly)
         show_ghrsst: Whether to show GHRSST satellite trace
         show_surface: Whether to show DOPPIO surface trace
         show_bottom: Whether to show DOPPIO bottom trace
+        show_ocim2: Whether to show OCIM2 buoy trace
 
     Returns:
-        Plotly figure with single plot and 3 overlaid traces
+        Plotly figure with single plot and up to 4 overlaid traces
     """
     # Filter dataframes if time_range is provided
     if time_range is not None:
         df_ghrsst_plot = df_ghrsst[(df_ghrsst['time'] >= time_range[0]) & (df_ghrsst['time'] <= time_range[1])]
         df_surface_plot = df_surface[(df_surface['time'] >= time_range[0]) & (df_surface['time'] <= time_range[1])]
         df_bottom_plot = df_bottom[(df_bottom['time'] >= time_range[0]) & (df_bottom['time'] <= time_range[1])]
+        if df_ocim2 is not None:
+            df_ocim2_plot = df_ocim2[(df_ocim2['time'] >= time_range[0]) & (df_ocim2['time'] <= time_range[1])]
+        else:
+            df_ocim2_plot = None
     else:
         df_ghrsst_plot = df_ghrsst
         df_surface_plot = df_surface
         df_bottom_plot = df_bottom
+        df_ocim2_plot = df_ocim2
 
     # Create single plot figure
     fig = go.Figure()
@@ -380,6 +412,27 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
             )
         )
 
+    # Add OCIM2 Buoy trace (lime)
+    if show_ocim2 and df_ocim2_plot is not None and len(df_ocim2_plot) > 0:
+        fig.add_trace(
+            go.Scatter(
+                x=df_ocim2_plot['time'],
+                y=df_ocim2_plot['temp_mean'],
+                mode='lines+markers',
+                name='OCIM2 Buoy',
+                line=dict(color='lime', width=2),
+                marker=dict(size=4),
+                error_y=dict(
+                    type='data',
+                    array=df_ocim2_plot['temp_stderr'],
+                    visible=True,
+                    color='rgba(0,255,0,0.3)',
+                    thickness=1
+                ),
+                hovertemplate='<b>OCIM2 Buoy</b><br>%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+            )
+        )
+
     # Add mean lines for visible traces
     if show_ghrsst and len(df_ghrsst_plot) > 0:
         overall_ghrsst = df_ghrsst_plot['temp_mean'].mean()
@@ -400,6 +453,13 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, time_range=N
         fig.add_hline(y=overall_bottom, line_dash="dash", line_color="red",
                       line_width=1, opacity=0.5,
                       annotation_text=f"Bottom Mean: {overall_bottom:.1f}°C",
+                      annotation_position="right")
+
+    if show_ocim2 and df_ocim2_plot is not None and len(df_ocim2_plot) > 0:
+        overall_ocim2 = df_ocim2_plot['temp_mean'].mean()
+        fig.add_hline(y=overall_ocim2, line_dash="dash", line_color="lime",
+                      line_width=1, opacity=0.5,
+                      annotation_text=f"OCIM2 Mean: {overall_ocim2:.1f}°C",
                       annotation_position="right")
 
         # Set x-axis range to the Doppio bottom temperature data range
