@@ -91,8 +91,8 @@ def apply_custom_css():
         padding: 0.35rem;
         border-radius: 0.75rem;
         background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 215, 0, 0.35);
-        box-shadow: 0 0 18px rgba(255, 170, 0, 0.15);
+        border: 1px solid rgba(34, 255, 0, 0.35);
+        box-shadow: 0 0 18px rgba(13, 112, 23, 0.8);
     }
     [data-testid="stSidebarNav"] a {
         display: flex;
@@ -107,7 +107,7 @@ def apply_custom_css():
     }
     [data-testid="stSidebarNav"] a:hover,
     [data-testid="stSidebarNav"] a:focus {
-        background: rgba(255, 215, 0, 0.15);
+        background: rgba(40, 255, 140, 0.2);
         transform: translateX(4px);
     }
     [data-testid="stSidebarNav"] a[aria-current="page"] {
