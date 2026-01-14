@@ -481,9 +481,9 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=Non
         legend=dict(
             x=0.02,
             y=0.98,
-            xanchor='left',
-            yanchor='top',
-            bgcolor='rgba(255,255,255,0.8)',
+            xanchor='center',
+            yanchor='bottom',
+            bgcolor='rgba(255,255,255,0.1)',
             bordercolor='gray',
             borderwidth=1
         ),
