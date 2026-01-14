@@ -72,17 +72,29 @@ def apply_custom_css():
     }
 
     /* Highlight clickable page links so the script names stand out */
-    section[data-testid="stSidebarNav"] {
+    [data-testid="stSidebarNav"] {
         margin-bottom: 1rem;
+        position: relative;
     }
-    section[data-testid="stSidebarNav"] ul {
+    [data-testid="stSidebarNav"]::before {
+        content: "Select a page:";
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 600;
+        text-transform: capitalize;
+        letter-spacing: 0.05em;
+        font-family: "Source Sans Pro", var(--font-family, "Source Sans Pro"), sans-serif;
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 0.45rem;
+    }
+    [data-testid="stSidebarNav"] ul {
         padding: 0.35rem;
         border-radius: 0.75rem;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 215, 0, 0.35);
         box-shadow: 0 0 18px rgba(255, 170, 0, 0.15);
     }
-    section[data-testid="stSidebarNav"] a {
+    [data-testid="stSidebarNav"] a {
         display: flex;
         align-items: center;
         padding: 0.35rem 0.65rem;
@@ -93,16 +105,33 @@ def apply_custom_css():
         text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
         transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
     }
-    section[data-testid="stSidebarNav"] a:hover,
-    section[data-testid="stSidebarNav"] a:focus {
+    [data-testid="stSidebarNav"] a:hover,
+    [data-testid="stSidebarNav"] a:focus {
         background: rgba(255, 215, 0, 0.15);
         transform: translateX(4px);
     }
-    section[data-testid="stSidebarNav"] a[aria-current="page"] {
+    [data-testid="stSidebarNav"] a[aria-current="page"] {
         background: linear-gradient(90deg, #ffc94b, #ff9f1c);
         color: #151515 !important;
         box-shadow: 0 0 15px rgba(255, 187, 68, 0.4);
         text-shadow: none;
+    }
+    nav[aria-label="Page navigation"],
+    nav[aria-label="pages"] {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+    }
+    nav[aria-label="Page navigation"]::before,
+    nav[aria-label="pages"]::before {
+        content: "Select a page";
+        font-size: 0.95rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-family: "Source Sans Pro", var(--font-family, "Source Sans Pro"), sans-serif;
+        color: rgba(255, 255, 255, 0.85);
     }
     nav[aria-label="Page navigation"] a,
     nav[aria-label="pages"] a {
