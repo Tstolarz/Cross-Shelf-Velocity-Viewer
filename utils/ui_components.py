@@ -107,7 +107,7 @@ def apply_custom_css():
     }
     [data-testid="stSidebarNav"] a:hover,
     [data-testid="stSidebarNav"] a:focus {
-        background: rgba(40, 255, 140, 0.2);
+        background: rgba(40, 255, 140, 0.4);
         transform: translateX(4px);
     }
     [data-testid="stSidebarNav"] a[aria-current="page"] {
