@@ -70,6 +70,52 @@ def apply_custom_css():
         80% { opacity: 1; visibility: visible; }
         100% { opacity: 0; visibility: hidden; height: 0; margin: 0; padding: 0; overflow: hidden; }
     }
+
+    /* Highlight clickable page links so the script names stand out */
+    section[data-testid="stSidebarNav"] {
+        margin-bottom: 1rem;
+    }
+    section[data-testid="stSidebarNav"] ul {
+        padding: 0.35rem;
+        border-radius: 0.75rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 215, 0, 0.35);
+        box-shadow: 0 0 18px rgba(255, 170, 0, 0.15);
+    }
+    section[data-testid="stSidebarNav"] a {
+        display: flex;
+        align-items: center;
+        padding: 0.35rem 0.65rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: #fafafa !important;
+        text-shadow: 0 0 4px rgba(0, 0, 0, 0.45);
+        transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+    section[data-testid="stSidebarNav"] a:hover,
+    section[data-testid="stSidebarNav"] a:focus {
+        background: rgba(255, 215, 0, 0.15);
+        transform: translateX(4px);
+    }
+    section[data-testid="stSidebarNav"] a[aria-current="page"] {
+        background: linear-gradient(90deg, #ffc94b, #ff9f1c);
+        color: #151515 !important;
+        box-shadow: 0 0 15px rgba(255, 187, 68, 0.4);
+        text-shadow: none;
+    }
+    nav[aria-label="Page navigation"] a,
+    nav[aria-label="pages"] a {
+        border-radius: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        font-weight: 600;
+    }
+    nav[aria-label="Page navigation"] a[aria-current="page"],
+    nav[aria-label="pages"] a[aria-current="page"] {
+        background: linear-gradient(90deg, #ffc94b, #ff9f1c);
+        color: #151515 !important;
+        box-shadow: 0 0 15px rgba(255, 187, 68, 0.4);
+    }
 </style>
 
 <script>
