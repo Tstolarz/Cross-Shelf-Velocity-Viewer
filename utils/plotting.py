@@ -188,7 +188,7 @@ def create_base_map(lat, lon, ocim2_lat=None, ocim2_lon=None):
                    transform=ccrs.PlateCarree(), label='OCIM2 Buoy')
 
         # Add legend
-        ax.legend(loc='upper right', framealpha=0.9)
+        ax.legend(loc='lower center', framealpha=0.9)
 
     # Convert to image
     buf = BytesIO()
