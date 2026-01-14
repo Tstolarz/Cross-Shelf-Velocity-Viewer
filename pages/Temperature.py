@@ -191,7 +191,7 @@ def show_daily_temperature_page():
         ghrsst_path = "ghrsst_MBON3_daily.nc"
         doppio_surface_path = "doppio_timeseries_surface.nc"
         doppio_bottom_path = "doppio_timeseries_bottom.nc"
-        ocim2_path = "/Users/timothystolarz/python_projects/plotting_tools/outputs/ocim2_combined_hourly.csv"
+        ocim2_path = "ocim2_combined_hourly.csv"
 
         if not Path(ghrsst_path).exists():
             st.error(f"GHRSST daily file not found: {ghrsst_path}")
