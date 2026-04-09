@@ -196,50 +196,35 @@ def load_ghrsst_data(nc_path):
     return df
 
 @st.cache_data
-def load_ocim2_data(csv_path, resample_freq='D'):
-    """Load OCIM2 buoy water temperature data
+def load_ocim2_data(csv_path, resample_freq='D', lat=38.328, lon=-75.091):
+    """Load NDBC buoy water temperature data (WTMP column).
+
+    Works for any NDBC-format hourly CSV (OCIM2, ACYN4, etc.).
 
     Args:
-        csv_path: Path to processed OCIM2 hourly CSV file
+        csv_path: Path to processed hourly CSV file
         resample_freq: 'D' (daily), 'W' (weekly), 'MS' (monthly-start)
+        lat: Buoy latitude (default: OCIM2 Delaware Bay)
+        lon: Buoy longitude (default: OCIM2 Delaware Bay)
 
     Returns:
         DataFrame with columns: time, temp_mean, temp_std, temp_count,
                                 temp_stderr, lat_mean, lon_mean
     """
-    # Load hourly buoy data
     df = pd.read_csv(csv_path, parse_dates=['datetime'], index_col='datetime')
 
-    # Extract water temperature column (WTMP in NDBC data)
     if 'WTMP' not in df.columns:
-        raise ValueError("WTMP (water temperature) column not found in OCIM2 data")
+        raise ValueError("WTMP (water temperature) column not found in buoy data")
 
-    # Keep only temperature column
-    df_temp = df[['WTMP']].copy()
+    df_temp = df[['WTMP']].copy().dropna()
 
-    # Remove NaN values
-    df_temp = df_temp.dropna()
-
-    # Resample to desired frequency
-    agg_dict = {
-        'WTMP': ['mean', 'std', 'count']
-    }
-
-    resampled = df_temp.resample(resample_freq).agg(agg_dict)
-
-    # Flatten column names
+    resampled = df_temp.resample(resample_freq).agg({'WTMP': ['mean', 'std', 'count']})
     resampled.columns = ['temp_mean', 'temp_std', 'temp_count']
     resampled.reset_index(inplace=True)
     resampled.rename(columns={'datetime': 'time'}, inplace=True)
 
-    # Calculate standard error
     resampled['temp_stderr'] = resampled['temp_std'] / np.sqrt(resampled['temp_count'])
+    resampled['lat_mean'] = lat
+    resampled['lon_mean'] = lon
 
-    # Add location (OCIM2 buoy in Delaware Bay)
-    resampled['lat_mean'] = 38.328
-    resampled['lon_mean'] = -75.091
-
-    # Keep only rows with data
-    resampled = resampled[resampled['temp_count'] > 0].copy()
-
-    return resampled
+    return resampled[resampled['temp_count'] > 0].copy()

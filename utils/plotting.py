@@ -135,14 +135,15 @@ def update_selection(base_fig, selected_time):
 
 @st.cache_data
 @time_it("create_base_map")
-def create_base_map(lat, lon, ocim2_lat=None, ocim2_lon=None):
+def create_base_map(lat, lon, ocim2_lat=None, ocim2_lon=None, primary_label='MBON3'):
     """Create base map once and cache it
 
     Args:
-        lat: Latitude of primary location (MBON3)
-        lon: Longitude of primary location (MBON3)
+        lat: Latitude of primary location
+        lon: Longitude of primary location
         ocim2_lat: Optional latitude of OCIM2 buoy
         ocim2_lon: Optional longitude of OCIM2 buoy
+        primary_label: Label for the primary location marker (default 'MBON3')
     """
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
@@ -178,9 +179,9 @@ def create_base_map(lat, lon, ocim2_lat=None, ocim2_lon=None):
     gl.top_labels = False
     gl.right_labels = False
 
-    # Plot primary location point (MBON3 - red)
+    # Plot primary location point (red)
     ax.scatter(lon, lat, color='red', s=100, zorder=5,
-               transform=ccrs.PlateCarree(), label='MBON3')
+               transform=ccrs.PlateCarree(), label=primary_label)
 
     # Plot OCIM2 buoy location (lime) if provided
     if ocim2_lat is not None and ocim2_lon is not None:
@@ -313,7 +314,8 @@ def create_map_plot(df, selected_idx, base_map_bytes, freq_label="Monthly", arro
 
 @time_it("create_temperature_timeseries")
 def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=None, time_range=None, freq_label="Daily",
-                                  show_ghrsst=True, show_surface=True, show_bottom=True, show_ocim2=True):
+                                  show_ghrsst=True, show_surface=True, show_bottom=True, show_ocim2=True,
+                                  buoy_label='OCIM2 Buoy'):
     """Create single overlay plot with all temperature time series
 
     Args:
@@ -412,14 +414,14 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=Non
             )
         )
 
-    # Add OCIM2 Buoy trace (lime)
+    # Add buoy trace (lime)
     if show_ocim2 and df_ocim2_plot is not None and len(df_ocim2_plot) > 0:
         fig.add_trace(
             go.Scatter(
                 x=df_ocim2_plot['time'],
                 y=df_ocim2_plot['temp_mean'],
                 mode='lines+markers',
-                name='OCIM2 Buoy',
+                name=buoy_label,
                 line=dict(color='lime', width=2),
                 marker=dict(size=4),
                 error_y=dict(
@@ -429,7 +431,7 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=Non
                     color='rgba(0,255,0,0.3)',
                     thickness=1
                 ),
-                hovertemplate='<b>OCIM2 Buoy</b><br>%{x}<br>%{y:.2f} ± %{error_y.array:.2f} °C<extra></extra>'
+                hovertemplate=f'<b>{buoy_label}</b><br>%{{x}}<br>%{{y:.2f}} ± %{{error_y.array:.2f}} °C<extra></extra>'
             )
         )
 
@@ -459,17 +461,22 @@ def create_temperature_timeseries(df_ghrsst, df_surface, df_bottom, df_ocim2=Non
         overall_ocim2 = df_ocim2_plot['temp_mean'].mean()
         fig.add_hline(y=overall_ocim2, line_dash="dash", line_color="lime",
                       line_width=1, opacity=0.5,
-                      annotation_text=f"OCIM2 Mean: {overall_ocim2:.1f}°C",
+                      annotation_text=f"{buoy_label} Mean: {overall_ocim2:.1f}°C",
                       annotation_position="right")
 
-        # Set x-axis range to the Doppio bottom temperature data range
-    doppio_times = df_bottom_plot['time'].tolist()
-    
+    # Set x-axis range to the span of all visible datasets so the end date
+    # reflects whichever dataset runs the latest, not just DOPPIO bottom.
+    all_times = []
+    if show_ghrsst and len(df_ghrsst_plot) > 0:
+        all_times += df_ghrsst_plot['time'].tolist()
+    if show_surface and len(df_surface_plot) > 0:
+        all_times += df_surface_plot['time'].tolist()
+    if show_bottom and len(df_bottom_plot) > 0:
+        all_times += df_bottom_plot['time'].tolist()
+    if show_ocim2 and df_ocim2_plot is not None and len(df_ocim2_plot) > 0:
+        all_times += df_ocim2_plot['time'].tolist()
 
-    if doppio_times:
-        xaxis_range = [min(doppio_times), max(doppio_times)]
-    else:
-        xaxis_range = None
+    xaxis_range = [min(all_times), max(all_times)] if all_times else None
 
     # Update layout
     fig.update_layout(
